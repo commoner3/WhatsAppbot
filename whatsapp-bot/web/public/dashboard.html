@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Bot Analytics</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0d1210;
+    --panel: #141b18;
+    --border: #263129;
+    --text: #e6ede8;
+    --muted: #7d8f84;
+    --accent: #3ddc84;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
+    padding: 24px;
+  }
+  .wrap { max-width: 920px; margin: 0 auto; }
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  h1 { font-size: 17px; font-weight: 600; margin: 0; }
+  a.back { color: var(--muted); font-size: 12.5px; text-decoration: none; }
+  a.back:hover { color: var(--accent); }
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+  }
+  .card .label { color: var(--muted); font-size: 12px; margin-bottom: 6px; }
+  .card .value { font-size: 26px; font-weight: 700; color: var(--accent); }
+  .panels { display: grid; grid-template-columns: 1fr; gap: 16px; }
+  @media (min-width: 720px) {
+    .panels { grid-template-columns: 1.4fr 1fr; }
+  }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px;
+  }
+  .panel h2 {
+    font-size: 13px;
+    color: var(--muted);
+    font-weight: 600;
+    margin: 0 0 14px;
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 8px 4px; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 500; }
+  .empty { color: var(--muted); font-size: 13px; padding: 20px 0; text-align: center; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>Bot Analytics</h1>
+      <a class="back" href="/">← Pairing page</a>
+    </header>
+
+    <div class="cards" id="cards"></div>
+
+    <div class="panels">
+      <div class="panel">
+        <h2>Messages — last 14 days</h2>
+        <canvas id="messagesChart" height="140"></canvas>
+      </div>
+      <div class="panel">
+        <h2>Command usage</h2>
+        <canvas id="commandsChart" height="140"></canvas>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-top:16px;">
+      <h2>Most active senders</h2>
+      <div id="topUsers"></div>
+    </div>
+  </div>
+
+  <script>
+    async function loadStats() {
+      const res = await fetch('/api/stats');
+      const stats = await res.json();
+
+      document.getElementById('cards').innerHTML = [
+        ['Messages', stats.totalMessages],
+        ['Commands run', stats.totalCommands],
+        ['Active users', stats.uniqueUsers],
+        ['Active groups', stats.uniqueGroups],
+      ].map(([label, value]) => `
+        <div class="card">
+          <div class="label">${label}</div>
+          <div class="value">${value}</div>
+        </div>
+      `).join('');
+
+      new Chart(document.getElementById('messagesChart'), {
+        type: 'bar',
+        data: {
+          labels: stats.messagesByDay.map((d) => d.day.slice(5)),
+          datasets: [{
+            data: stats.messagesByDay.map((d) => d.count),
+            backgroundColor: '#3ddc84',
+            borderRadius: 4,
+          }],
+        },
+        options: {
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { ticks: { color: '#7d8f84' }, grid: { display: false } },
+            y: { ticks: { color: '#7d8f84' }, grid: { color: '#263129' }, beginAtZero: true },
+          },
+        },
+      });
+
+      const commandEntries = Object.entries(stats.commandCounts).sort((a, b) => b[1] - a[1]);
+      new Chart(document.getElementById('commandsChart'), {
+        type: 'bar',
+        data: {
+          labels: commandEntries.map(([cmd]) => cmd),
+          datasets: [{
+            data: commandEntries.map(([, count]) => count),
+            backgroundColor: '#3ddc84',
+            borderRadius: 4,
+          }],
+        },
+        options: {
+          indexAxis: 'y',
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { ticks: { color: '#7d8f84' }, grid: { color: '#263129' }, beginAtZero: true },
+            y: { ticks: { color: '#7d8f84' }, grid: { display: false } },
+          },
+        },
+      });
+
+      const topUsersEl = document.getElementById('topUsers');
+      if (!stats.topUsers.length) {
+        topUsersEl.innerHTML = '<div class="empty">No messages logged yet.</div>';
+      } else {
+        topUsersEl.innerHTML = `
+          <table>
+            <tr><th>Number</th><th>Messages</th></tr>
+            ${stats.topUsers.map((u) => `
+              <tr>
+                <td>${u.jid.split('@')[0]}</td>
+                <td>${u.count}</td>
+              </tr>
+            `).join('')}
+          </table>
+        `;
+      }
+    }
+
+    loadStats();
+  </script>
+</body>
+</html>

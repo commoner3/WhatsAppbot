@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Link WhatsApp</title>
+<style>
+  :root {
+    --bg: #0d1210;
+    --panel: #141b18;
+    --border: #263129;
+    --text: #e6ede8;
+    --muted: #7d8f84;
+    --accent: #3ddc84;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg);
+    color: var(--text);
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
+    padding: 24px;
+  }
+  .card {
+    width: 100%;
+    max-width: 380px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 28px;
+  }
+  h1 {
+    font-size: 17px;
+    font-weight: 600;
+    margin: 0 0 6px;
+    letter-spacing: 0.2px;
+  }
+  p.sub {
+    color: var(--muted);
+    font-size: 13px;
+    margin: 0 0 24px;
+    line-height: 1.5;
+  }
+  label {
+    display: block;
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+  .row { display: flex; gap: 8px; margin-bottom: 18px; }
+  select, input {
+    background: #0d1210;
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 6px;
+    padding: 10px 12px;
+    font-family: inherit;
+    font-size: 14px;
+  }
+  select { flex: 0 0 108px; }
+  input { flex: 1; min-width: 0; }
+  select:focus, input:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+  button {
+    width: 100%;
+    padding: 12px;
+    background: var(--accent);
+    color: #06120a;
+    border: none;
+    border-radius: 6px;
+    font-family: inherit;
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  button:disabled { opacity: 0.5; cursor: default; }
+  .result {
+    margin-top: 20px;
+    text-align: center;
+  }
+  .code {
+    font-size: 32px;
+    font-weight: 700;
+    letter-spacing: 6px;
+    color: var(--accent);
+    margin: 8px 0;
+  }
+  .steps {
+    text-align: left;
+    color: var(--muted);
+    font-size: 12.5px;
+    line-height: 1.7;
+    margin-top: 12px;
+  }
+  .error {
+    color: #ff6b6b;
+    font-size: 13px;
+    margin-top: 14px;
+    display: none;
+  }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1>Link your WhatsApp</h1>
+    <p class="sub">Enter your number to get a pairing code instead of scanning a QR.</p>
+    <form id="pair-form">
+      <label for="phone">Phone number</label>
+      <div class="row">
+        <select id="country">
+          <option value="233" selected>+233 GH</option>
+          <option value="1">+1 US/CA</option>
+          <option value="44">+44 UK</option>
+          <option value="91">+91 IN</option>
+          <option value="234">+234 NG</option>
+          <option value="27">+27 ZA</option>
+          <option value="971">+971 AE</option>
+          <option value="61">+61 AU</option>
+          <option value="49">+49 DE</option>
+          <option value="33">+33 FR</option>
+          <option value="55">+55 BR</option>
+          <option value="52">+52 MX</option>
+          <option value="63">+63 PH</option>
+          <option value="92">+92 PK</option>
+          <option value="880">+880 BD</option>
+        </select>
+        <input id="phone" type="tel" placeholder="5551234567" required />
+      </div>
+      <button id="submit-btn" type="submit">Get pairing code</button>
+    </form>
+
+    <div class="error" id="error"></div>
+
+    <div class="result hidden" id="result">
+      <p class="sub" style="margin-bottom:4px;">Your pairing code</p>
+      <div class="code" id="code">--------</div>
+      <div class="steps">
+        1. Open WhatsApp → Settings → Linked Devices<br>
+        2. Tap "Link a device" → "Link with phone number instead"<br>
+        3. Enter the code above before it expires
+      </div>
+    </div>
+
+    <p class="sub" style="margin:20px 0 0; text-align:center;">
+      <a href="/dashboard.html" style="color:var(--muted);">View bot analytics →</a>
+    </p>
+  </div>
+
+  <script>
+    const form = document.getElementById('pair-form');
+    const errorEl = document.getElementById('error');
+    const resultEl = document.getElementById('result');
+    const codeEl = document.getElementById('code');
+    const btn = document.getElementById('submit-btn');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      errorEl.style.display = 'none';
+      resultEl.classList.add('hidden');
+
+      const country = document.getElementById('country').value;
+      const phone = document.getElementById('phone').value.replace(/\D/g, '');
+      const phoneNumber = country + phone;
+
+      btn.disabled = true;
+      btn.textContent = 'Requesting...';
+
+      try {
+        const res = await fetch('/api/pair', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phoneNumber }),
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+          errorEl.textContent = data.error || 'Something went wrong.';
+          errorEl.style.display = 'block';
+        } else {
+          codeEl.textContent = data.code;
+          resultEl.classList.remove('hidden');
+        }
+      } catch (err) {
+        errorEl.textContent = 'Could not reach the server.';
+        errorEl.style.display = 'block';
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Get pairing code';
+      }
+    });
+  </script>
+</body>
+</html>
